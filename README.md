@@ -32,7 +32,7 @@ O desafio central é que `Exp`, `A` e `B` podem ser chamadas de procedimentos co
 
 O projeto exigirá modificações no analisador sintático e na fase de avaliação semântica para lidar com a nova sintaxe e suas regras de avaliação.
 
-### A. Análise Sintática (Parser)
+### A. Análise Sintática
 
   * **Expansão da Gramática (BNF):** Modificar a BNF para incluir a produção `Expressao "in" Intervalo`. A precedência deste operador deve ser similar à dos operadores relacionais (`<`, `>`, `==`).
 
@@ -51,19 +51,22 @@ O projeto exigirá modificações no analisador sintático e na fase de avaliaç
     DelimitadorDir ::= ")" | "]"
     ```
 
-### B. Análise Semântica e Runtime (Garantia de Avaliação Única)
+### B. Análise Semântica 
 
-A expressão `Expressao in Intervalo` deve ser transformada em uma lógica `AND` (duas comparações). O desafio central é a ordem e a memoização (armazenamento) da avaliação para garantir a corretude com *side effects*.
+A `ExpBinaria` da forma `Expressao "in" Intervalo` deve ser transformada em uma lógica AND (duas comparações). O desafio central é a ordem e a memoização (armazenamento) da avaliação para garantir a corretude com *side effects*.
 
 O interpretador deve implementar o seguinte mecanismo:
 
-1.  Identificar as três expressões: `Exp` (o valor a ser testado), `BoundA` (limite inferior) e `BoundB` (limite superior).
-2.  **Avaliar `Exp` e todos os seus *side effects* rigorosamente uma única vez** e armazenar seu resultado (`val_exp`).
-3.  **Consultar o Resultado de `Exp` (Core da Feature):** Se a expressão `BoundA` for *sintaticamente idêntica* a `Exp` (e.g., a mesma chamada de função `f()`), o interpretador **não deve re-executá-la**. Ele deve, em vez disso, usar o valor já armazenado (`val_exp`) como `val_bound_a`. O mesmo se aplica a `BoundB`.
-4.  Avaliar `BoundA` e `BoundB` (apenas se *não* forem idênticas a `Exp` e, portanto, não "consultadas" no passo 3) e armazenar seus resultados.
-5.  Executar as duas comparações lógicas (e.g., para `[A..B]`, seria `(val_bound_a <= val_exp) AND (val_exp < val_bound_b)`), respeitando o curto-circuito do `AND`.
+1.  Identificar as três sub-expressões envolvidas:
+    * A `Expressao` à esquerda do "in" (o valor a ser testado).
+    * A primeira `Expressao` dentro da definição de `Intervalo` (o limite inferior).
+    * A segunda `Expressao` dentro da definição de `Intervalo` (o limite superior).
+2.  Avaliar a `Expressao` à esquerda do "in" e todos os seus *side effects* rigorosamente uma única vez e armazenar seu resultado (vamos chamá-lo `val_exp`).
+3.  **Consultar o Resultado de `val_exp`:** Se a `Expressao` do limite inferior (de dentro do `Intervalo`) for sintaticamente idêntica à `Expressao` à esquerda do "in" (e.g., a mesma `ChamadaProcedimento` `call f()`), o interpretador não deve re-executá-la. Ele deve, em vez disso, usar o valor já armazenado (`val_exp`) como o valor do limite inferior (`val_bound_a`). O mesmo se aplica à `Expressao` do limite superior (`val_bound_b`).
+4.  Avaliar as expressões de limite inferior e superior (apenas se não forem sintaticamente idênticas à `Expressao` principal e, portanto, não "consultadas" no passo 3) e armazenar seus resultados.
+5.  Executar as duas comparações lógicas (cuja semântica exata depende dos `DelimEsq` e `DelimDir` do `Intervalo`), respeitando o curto-circuito do AND. (Por exemplo, para `[A..B)`, a lógica seria `(val_bound_a <= val_exp) AND (val_exp < val_bound_b)`).
 
-Esta abordagem garante que uma expressão tautológica como `f() in [f()..10)` execute `f()` apenas uma vez, usando seu resultado tanto como o valor a ser testado (`Exp`) quanto como o limite inferior (`BoundA`).
+Esta abordagem garante que uma `ExpBinaria` como `call f() in [call f()..10)` execute a `ChamadaProcedimento` `call f()` apenas uma vez, usando seu resultado tanto como o valor a ser testado (`val_exp`) quanto como o limite inferior (`val_bound_a`).
 
 ## 6\. Critérios de Aceitação (Teste Crítico de Tautologia e Side Effect)
 
