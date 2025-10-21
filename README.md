@@ -18,12 +18,13 @@ A nova feature introduz o operador `in` para verificação de intervalo, substit
 
 | Sintaxe LI2 | Equivalência Lógica | Definição (Limite A) | Definição (Limite B) |
 | :--- | :--- | :--- | :--- |
-| `Exp in (A..B)` | $(A < \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `(` Exclusivo | `)` Inclusivo |
-| `Exp in (A..B]` | $(A < \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `(` Exclusivo | `]` Exclusivo |
-| `Exp in [A..B)` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `[` Inclusivo | `)` Inclusivo |
-| `Exp in [A..B]` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `[` Inclusivo | `]` Exclusivo |
+| `Exp in (A..B)` | $(A < \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `(` Exclusivo | `)` Exclusivo |
+| `Exp in (A..B]` | $(A < \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `(` Exclusivo | `]` Inclusivo |
+| `Exp in [A..B)` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `[` Inclusivo | `)` Exclusivo |
+| `Exp in [A..B]` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `[` Inclusivo | `]` Inclusivo |
 
 O desafio central é que `Exp`, `A` e `B` podem ser chamadas de procedimentos com efeitos colaterais, e a semântica de avaliação deve ser rigorosa.
+
 
 -----
 
