@@ -1,80 +1,109 @@
+# Implementação do Construtor `between` com Intervalos Inclusivos, Exclusivos e Passo na LI2
 
-## 1\. Título do Projeto
+## 1. Título do Projeto
 
-**Implementação da Sintaxe de Comparação Encadeada na LI2 (e.g., `A < B < C`)**
+**Extensão da LI2 com o Construtor de Comparação Intervalar `between` (com suporte a limites inclusivos/exclusivos e passo opcional)**
 
-## 2\. Objetivo
+---
 
-Estender a **Linguagem Imperativa 2 (LI2)** para suportar comparações sequenciais em uma única expressão. O principal desafio é garantir que a expressão intermediária (`B` em `A < B < C`), que pode ser uma **chamada de procedimento com efeitos colaterais**, seja **avaliada rigorosamente uma única vez**.
+## 2. Objetivo
 
-## 3\. Linguagem-Base
+Estender a **Linguagem Imperativa 2 (LI2)** com uma nova forma sintática para expressar comparações intervalares de forma **clara, expressiva e eficiente**, inspirada em linguagens como SQL e notações matemáticas de intervalo.
+
+O novo construtor `between` permitirá expressar condições de pertencimento a intervalos numéricos, com suporte a:
+
+* Limites **inclusivos** e/ou **exclusivos** (ex: `[0..10)`);
+* **Expressões arbitrárias**, incluindo chamadas de funções com *side effects*;
+* Um **passo (`step`)** opcional, indicando granularidade de validação numérica.
+
+---
+
+## 3. Linguagem-Base
 
 Linguagem Imperativa 2 (LI2).
 
------
+---
 
-## 4\. Referência em Outras Linguagens (Python)
+## 4. Motivação e Referências
 
-Em linguagens como Python, a comparação encadeada é uma sintaxe válida que é expandida internamente (syntactic sugar). O comportamento é definido como:
+Em SQL, a expressão `x BETWEEN a AND b` é equivalente a `(x >= a AND x <= b)` — uma forma legível e direta de representar uma faixa de valores.
 
-| Expressão em Python | Equivalência Lógica Interna | Regra de Avaliação |
-| :--- | :--- | :--- |
-| `0 < x <= 10` | `(0 < x) and (x <= 10)` | `x` é avaliado apenas uma vez. |
+Em notação matemática, é comum representar intervalos com colchetes e parênteses, indicando se os limites são inclusivos (`[ ]`) ou exclusivos (`( )`), como `[0,10)`.
 
-**Exemplo de Garantia de Avaliação Única em Python:**
+A proposta combina essas duas ideias, trazendo para a LI2 uma **forma unificada e legível** de expressar comparações intervalares, **mantendo semântica rigorosa de avaliação única** (mesmo em expressões com *side effects*).
 
-```python
-# Função com side effect (altera o estado global 'count')
-count = 0
-def get_val():
-    global count
-    count += 1
-    return 5
+---
 
-# Teste: a função é chamada apenas uma vez
-if 0 < get_val() < 10:
-    pass
+## 5. Especificação da Nova Sintaxe
 
-# Resultado: count é 1, não 2
-print(count) 
-# Output: 1
+### A. Forma Geral
+
+```li2
+<expressao> between <intervalo> [step <expressao>]
 ```
 
-A implementação na LI2 deve replicar exatamente esse comportamento: avaliar a expressão intermediária uma única vez no *runtime* da LI2, independentemente de ela conter um procedimento com *side effects*.
+### B. Definição de Intervalo
 
------
+```li2
+<intervalo> ::= '[' <expressao> '..' <expressao> ']' 
+              | '[' <expressao> '..' <expressao> ')' 
+              | '(' <expressao> '..' <expressao> ']' 
+              | '(' <expressao> '..' <expressao> ')'
+```
 
-## 5\. Escopo Técnico e Implementação
+### C. Exemplo de Uso
 
-O projeto exigirá modificações significativas no analisador sintático e na fase de avaliação semântica para lidar com a complexidade procedural da LI2.
+```li2
+if (x between [0..10]) {
+    write("x está entre 0 e 10 (inclusive)");
+}
 
-### A. Análise Sintática (Parser)
+if (y between (0..10)) {
+    write("y está entre 0 e 10 (exclusive)");
+}
 
-  * **Expansão da Gramática:** Modificar a BNF para permitir o encadeamento de dois ou mais operadores relacionais consecutivos (ex: `Expressao Op Relacional Expressao Op Relacional Expressao`).
-  * **Precedência:** A nova sintaxe deve se integrar corretamente com a precedência de outros operadores, especialmente comandos de fluxo de controle da LI2 (`while`, `if`).
+if (z between [0..10) step 2) {
+    write("z está no intervalo [0,10) com passo 2");
+}
+```
 
-### B. Análise Semântica e Runtime 
+---
 
-  * **Transformação Lógica:** A expressão encadeada deve ser transformada em uma lógica `AND`: `(Exp1 Op1 Exp2) AND (Exp2 Op2 Exp3)`.
-  * **Garantia de Avaliação Única (Core do Projeto):** O interpretador deve implementar um mecanismo para:
-    1.  Identificar a expressão intermediária (`Exp2`).
-    2.  **Avaliar `Exp2` e todos os seus *side effects*** (incluindo chamadas de procedimentos/funções) **apenas uma vez** e armazenar o resultado.
-    3.  Usar o valor armazenado nas duas sub-comparações, respeitando o curto-circuito do `AND`. Se a primeira comparação falhar, a segunda não é executada, mas a avaliação única de `Exp2` já ocorreu.
+## 6. Semântica Interna
 
-## 6\. Critérios de Aceitação (Teste Crítico de Side Effect)
+A expressão `x between [a..b]` será traduzida internamente para:
 
-O projeto será aceito se for capaz de executar corretamente o seguinte cenário, demonstrando que a função com *side effect* é chamada apenas uma vez:
+| Notação            | Equivalência Interna    | Inclusividade                          |
+| :----------------- | :---------------------- | :------------------------------------- |
+| `x between [a..b]` | `(x >= a) and (x <= b)` | Ambos inclusivos                       |
+| `x between [a..b)` | `(x >= a) and (x < b)`  | Inferior inclusivo, superior exclusivo |
+| `x between (a..b]` | `(x > a) and (x <= b)`  | Inferior exclusivo, superior inclusivo |
+| `x between (a..b)` | `(x > a) and (x < b)`   | Ambos exclusivos                       |
+
+Quando usado com **`step`**, a expressão adiciona a condição adicional:
 
 ```
+((x - a) % step == 0)
+```
+
+---
+
+## 7. Avaliação e *Side Effects*
+
+Assim como na comparação encadeada, **todas as expressões devem ser avaliadas exatamente uma vez** — incluindo chamadas de função ou procedimentos com efeitos colaterais.
+
+### Exemplo Crítico:
+
+```li2
 {
     var count = 0;
-    
+
     proc side_effect_func() {
         count := count + 1;
         return 5;
     }
-    
-    if (0 < side_effect_func() < 10) {
+
+    if (side_effect_func() between [0..10)) {
         write("Sucesso");
     } else {
         write("Falha");
@@ -84,4 +113,82 @@ O projeto será aceito se for capaz de executar corretamente o seguinte cenário
 }
 ```
 
-**Resultado Esperado:** A variável `count` deve terminar com o valor **1**.
+**Resultado Esperado:**
+A função `side_effect_func` é chamada **uma única vez**, mesmo que seu valor participe de duas comparações.
+
+---
+
+## 8. Impacto Sintático e Semântico
+
+### A. Léxico
+
+* Adição das palavras reservadas:
+  `between`, `step`
+* Reconhecimento dos símbolos:
+  `'['`, `']'`, `'('`, `')'`, `'..'`
+
+### B. Gramática (BNF Simplificada)
+
+```bnf
+<comparacao> ::= <expressao> 'between' <intervalo> [ 'step' <expressao> ]
+
+<intervalo> ::= '[' <expressao> '..' <expressao> ']' 
+              | '[' <expressao> '..' <expressao> ')' 
+              | '(' <expressao> '..' <expressao> ']' 
+              | '(' <expressao> '..' <expressao> ')'
+```
+
+### C. Semântica de Execução
+
+* Avaliar `Exp`, `Low`, `High` (e `Step`, se presente) **exatamente uma vez**.
+* Converter a forma `between` para expressões equivalentes de comparação lógica.
+* Implementar curto-circuito (`AND` lógico) na verificação do intervalo.
+* Aplicar a condição de passo apenas se o operador `step` for especificado.
+
+---
+
+## 9. Critérios de Aceitação
+
+O projeto será considerado **concluído com sucesso** se:
+
+1. **Expressões `between`** com todos os tipos de intervalos inclusivos/exclusivos forem aceitas e traduzidas corretamente.
+2. **Funções com efeitos colaterais** dentro das expressões forem avaliadas apenas uma vez.
+3. O **operador `step`** for corretamente aplicado e respeitar a semântica de curto-circuito.
+4. A nova sintaxe se integrar sem conflitos com as demais construções da LI2 (`if`, `while`, expressões compostas etc.).
+
+---
+
+## 10. Exemplo Completo de Teste
+
+```li2
+{
+    var count = 0;
+
+    proc get_val() {
+        count := count + 1;
+        return 5;
+    }
+
+    if (get_val() between [0..10) step 2) {
+        write("No intervalo com passo 2");
+    }
+
+    write(count); // Deve imprimir 1
+}
+```
+
+**Resultado Esperado:**
+
+```
+No intervalo com passo 2
+1
+```
+
+---
+
+## 11. Extensões Futuras
+
+* Suporte a intervalos não numéricos (ex: caracteres, datas).
+* Otimização da análise semântica via *short-circuit code generation*.
+* Integração com expressões compostas: `if ((x between [0..10]) or (y between (20..30)))`.
+
