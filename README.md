@@ -1,109 +1,86 @@
-# Implementação do Construtor `between` com Intervalos Inclusivos, Exclusivos e Passo na LI2
+## 1\. Título do Projeto
 
-## 1. Título do Projeto
+**Implementação do Operador de Intervalo 'in' na LI2 (e.g., `Exp in [A..B)`)**
 
-**Extensão da LI2 com o Construtor de Comparação Intervalar `between` (com suporte a limites inclusivos/exclusivos e passo opcional)**
+## 2\. Objetivo
 
----
+Estender a **Linguagem Imperativa 2 (LI2)** para suportar um **operador de verificação de intervalo (`in`)**. O principal desafio é garantir a **avaliação única** de expressões com **efeitos colaterais (side effects)**, especialmente em casos tautológicos (e.g., `f() in [f()..B)`), onde a expressão (`f()`) deve ser avaliada rigorosamente uma única vez e seu resultado reutilizado.
 
-## 2. Objetivo
-
-Estender a **Linguagem Imperativa 2 (LI2)** com uma nova forma sintática para expressar comparações intervalares de forma **clara, expressiva e eficiente**, inspirada em linguagens como SQL e notações matemáticas de intervalo.
-
-O novo construtor `between` permitirá expressar condições de pertencimento a intervalos numéricos, com suporte a:
-
-* Limites **inclusivos** e/ou **exclusivos** (ex: `[0..10)`);
-* **Expressões arbitrárias**, incluindo chamadas de funções com *side effects*;
-* Um **passo (`step`)** opcional, indicando granularidade de validação numérica.
-
----
-
-## 3. Linguagem-Base
+## 3\. Linguagem-Base
 
 Linguagem Imperativa 2 (LI2).
 
----
+-----
 
-## 4. Motivação e Referências
+## 4\. Definição da Nova Sintaxe: Operador 'in'
 
-Em SQL, a expressão `x BETWEEN a AND b` é equivalente a `(x >= a AND x <= b)` — uma forma legível e direta de representar uma faixa de valores.
+A nova feature introduz o operador `in` para verificação de intervalo, substituindo a sintaxe de comparação encadeada. A sintaxe permite definir intervalos abertos ou fechados em ambas as extremidades, com a seguinte semântica:
 
-Em notação matemática, é comum representar intervalos com colchetes e parênteses, indicando se os limites são inclusivos (`[ ]`) ou exclusivos (`( )`), como `[0,10)`.
+| Sintaxe LI2 | Equivalência Lógica | Definição (Limite A) | Definição (Limite B) |
+| :--- | :--- | :--- | :--- |
+| `Exp in (A..B)` | $(A < \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `(` Exclusivo | `)` Inclusivo |
+| `Exp in (A..B]` | $(A < \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `(` Exclusivo | `]` Exclusivo |
+| `Exp in [A..B)` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `[` Inclusivo | `)` Inclusivo |
+| `Exp in [A..B]` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `[` Inclusivo | `]` Exclusivo |
 
-A proposta combina essas duas ideias, trazendo para a LI2 uma **forma unificada e legível** de expressar comparações intervalares, **mantendo semântica rigorosa de avaliação única** (mesmo em expressões com *side effects*).
+O desafio central é que `Exp`, `A` e `B` podem ser chamadas de procedimentos com efeitos colaterais, e a semântica de avaliação deve ser rigorosa.
 
----
+-----
 
-## 5. Especificação da Nova Sintaxe
+## 5\. Escopo Técnico e Implementação
 
-### A. Forma Geral
+O projeto exigirá modificações no analisador sintático e na fase de avaliação semântica para lidar com a nova sintaxe e suas regras de avaliação.
 
-```li2
-<expressao> between <intervalo> [step <expressao>]
-```
+### A. Análise Sintática (Parser)
 
-### B. Definição de Intervalo
+  * **Expansão da Gramática (BNF):** Modificar a BNF para incluir a produção `expressao "in" intervalo`. A precedência deste operador deve ser similar à dos operadores relacionais (`<`, `>`, `==`).
 
-```li2
-<intervalo> ::= '[' <expressao> '..' <expressao> ']' 
-              | '[' <expressao> '..' <expressao> ')' 
-              | '(' <expressao> '..' <expressao> ']' 
-              | '(' <expressao> '..' <expressao> ')'
-```
+    ```bnf
+    <expr_bool> ::= <expr> <op_rel> <expr>
+                  | <expr> "in" <intervalo>
+                  | ...
 
-### C. Exemplo de Uso
+    <intervalo> ::= <delim_esq> <expr> ".." <expr> <delim_dir>
 
-```li2
-if (x between [0..10]) {
-    write("x está entre 0 e 10 (inclusive)");
-}
+    <delim_esq> ::= "(" | "["
+    <delim_dir> ::= ")" | "]"
 
-if (y between (0..10)) {
-    write("y está entre 0 e 10 (exclusive)");
-}
+    <expr> ::= ... (definição de expressão padrão da LI2)
+    ```
 
-if (z between [0..10) step 2) {
-    write("z está no intervalo [0,10) com passo 2");
-}
-```
+### B. Análise Semântica e Runtime (Garantia de Avaliação Única)
 
----
+A expressão `Exp in <Intervalo>` deve ser transformada em uma lógica `AND` (duas comparações). O desafio central é a ordem e a memoização (armazenamento) da avaliação para garantir a corretude com *side effects*.
 
-## 6. Semântica Interna
+O interpretador deve implementar o seguinte mecanismo:
 
-A expressão `x between [a..b]` será traduzida internamente para:
+1.  Identificar as três expressões: `Exp` (o valor a ser testado), `BoundA` (limite inferior) e `BoundB` (limite superior).
+2.  **Avaliar `Exp` e todos os seus *side effects* rigorosamente uma única vez** e armazenar seu resultado (`val_exp`).
+3.  **Consultar o Resultado de `Exp` (Core da Feature):** Se a expressão `BoundA` for *sintaticamente idêntica* a `Exp` (e.g., a mesma chamada de função `f()`), o interpretador **não deve re-executá-la**. Ele deve, em vez disso, usar o valor já armazenado (`val_exp`) como `val_bound_a`. O mesmo se aplica a `BoundB`.
+4.  Avaliar `BoundA` e `BoundB` (apenas se *não* forem idênticas a `Exp` e, portanto, não "consultadas" no passo 3) e armazenar seus resultados.
+5.  Executar as duas comparações lógicas (e.g., para `[A..B]`, seria `(val_bound_a <= val_exp) AND (val_exp < val_bound_b)`), respeitando o curto-circuito do `AND`.
 
-| Notação            | Equivalência Interna    | Inclusividade                          |
-| :----------------- | :---------------------- | :------------------------------------- |
-| `x between [a..b]` | `(x >= a) and (x <= b)` | Ambos inclusivos                       |
-| `x between [a..b)` | `(x >= a) and (x < b)`  | Inferior inclusivo, superior exclusivo |
-| `x between (a..b]` | `(x > a) and (x <= b)`  | Inferior exclusivo, superior inclusivo |
-| `x between (a..b)` | `(x > a) and (x < b)`   | Ambos exclusivos                       |
+Esta abordagem garante que uma expressão tautológica como `f() in [f()..10)` execute `f()` apenas uma vez, usando seu resultado tanto como o valor a ser testado (`Exp`) quanto como o limite inferior (`BoundA`).
 
-Quando usado com **`step`**, a expressão adiciona a condição adicional:
+## 6\. Critérios de Aceitação (Teste Crítico de Tautologia e Side Effect)
+
+O projeto será aceito se for capaz de executar corretamente o seguinte cenário, demonstrando que a função com *side effect* é chamada apenas uma vez no caso tautológico.
 
 ```
-((x - a) % step == 0)
-```
-
----
-
-## 7. Avaliação e *Side Effects*
-
-Assim como na comparação encadeada, **todas as expressões devem ser avaliadas exatamente uma vez** — incluindo chamadas de função ou procedimentos com efeitos colaterais.
-
-### Exemplo Crítico:
-
-```li2
 {
     var count = 0;
-
+    
     proc side_effect_func() {
         count := count + 1;
         return 5;
     }
-
-    if (side_effect_func() between [0..10)) {
+    
+    // Teste Crítico: Tautologia e Avaliação Única
+    // Usando a sintaxe [A..B), que equivale a A <= x <= B.
+    // A expressão 'side_effect_func()' é Exp e também BoundA.
+    // Ela deve ser avaliada APENAS UMA VEZ.
+    
+    if (side_effect_func() in [side_effect_func()..10)) {
         write("Sucesso");
     } else {
         write("Falha");
@@ -113,82 +90,4 @@ Assim como na comparação encadeada, **todas as expressões devem ser avaliadas
 }
 ```
 
-**Resultado Esperado:**
-A função `side_effect_func` é chamada **uma única vez**, mesmo que seu valor participe de duas comparações.
-
----
-
-## 8. Impacto Sintático e Semântico
-
-### A. Léxico
-
-* Adição das palavras reservadas:
-  `between`, `step`
-* Reconhecimento dos símbolos:
-  `'['`, `']'`, `'('`, `')'`, `'..'`
-
-### B. Gramática (BNF Simplificada)
-
-```bnf
-<comparacao> ::= <expressao> 'between' <intervalo> [ 'step' <expressao> ]
-
-<intervalo> ::= '[' <expressao> '..' <expressao> ']' 
-              | '[' <expressao> '..' <expressao> ')' 
-              | '(' <expressao> '..' <expressao> ']' 
-              | '(' <expressao> '..' <expressao> ')'
-```
-
-### C. Semântica de Execução
-
-* Avaliar `Exp`, `Low`, `High` (e `Step`, se presente) **exatamente uma vez**.
-* Converter a forma `between` para expressões equivalentes de comparação lógica.
-* Implementar curto-circuito (`AND` lógico) na verificação do intervalo.
-* Aplicar a condição de passo apenas se o operador `step` for especificado.
-
----
-
-## 9. Critérios de Aceitação
-
-O projeto será considerado **concluído com sucesso** se:
-
-1. **Expressões `between`** com todos os tipos de intervalos inclusivos/exclusivos forem aceitas e traduzidas corretamente.
-2. **Funções com efeitos colaterais** dentro das expressões forem avaliadas apenas uma vez.
-3. O **operador `step`** for corretamente aplicado e respeitar a semântica de curto-circuito.
-4. A nova sintaxe se integrar sem conflitos com as demais construções da LI2 (`if`, `while`, expressões compostas etc.).
-
----
-
-## 10. Exemplo Completo de Teste
-
-```li2
-{
-    var count = 0;
-
-    proc get_val() {
-        count := count + 1;
-        return 5;
-    }
-
-    if (get_val() between [0..10) step 2) {
-        write("No intervalo com passo 2");
-    }
-
-    write(count); // Deve imprimir 1
-}
-```
-
-**Resultado Esperado:**
-
-```
-No intervalo com passo 2
-1
-```
-
----
-
-## 11. Extensões Futuras
-
-* Suporte a intervalos não numéricos (ex: caracteres, datas).
-* Otimização da análise semântica via *short-circuit code generation*.
-* Integração com expressões compostas: `if ((x between [0..10]) or (y between (20..30)))`.
-
+**Resultado Esperado:** A variável `count` deve terminar com o valor **1**. Se o valor for 2, a implementação falhou em reutilizar o resultado da expressão `Exp` para o limite `BoundA`.
