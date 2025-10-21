@@ -113,6 +113,7 @@ TOKEN : /* TOKENS DE EXPRESSOES 1 */
 | < LENGTH      : "length" > 
 | < TRUE        : "true" >
 | < FALSE       : "false" >
+| < IN          : "in" >
 }
 
 TOKEN : /* TOKENS DE IMPERATIVA 1 */
@@ -339,16 +340,16 @@ Write PWrite() :
 IfThenElse PIfThenElse() :
 {
 	Expressao expressao;
-	Comando comandoThen;
-	Comando comandoElse;
+    Comando comandoThen;
+    Comando comandoElse;
 }
 {
 	<IF>
 		expressao = PExpressao()
 	<THEN>
-		comandoThen = PComando()
+        comandoThen = PComandoSimples()
 	<ELSE>
-		comandoElse = PComando()
+        comandoElse = PComandoSimples()
 	{return new IfThenElse (expressao, comandoThen, comandoElse);}
 }
 
@@ -527,6 +528,8 @@ Expressao PExpBinaria() :
 			retorno = PExpOr()
 		| LOOKAHEAD (PExpPrimaria() <EQ>)
 			retorno = PExpEquals()
+        | LOOKAHEAD (PExpPrimaria() <IN>)
+            retorno = PExpIn()
 		| LOOKAHEAD (PExpPrimaria() <PLUS>)
 			retorno = PExpSoma()
 	)
@@ -618,7 +621,7 @@ Expressao PExpressao() :
 	(
 	    LOOKAHEAD (2) 
 	  		retorno = PExpUnaria()
-	  | LOOKAHEAD (PExpPrimaria() (<OR> | <AND> | <MINUS> | <PLUS> | <EQ> | <CONCAT>)) 
+      | LOOKAHEAD (PExpPrimaria() (<OR> | <AND> | <MINUS> | <PLUS> | <EQ> | <IN> | <CONCAT>)) 
 	  		retorno = PExpBinaria()
 	  |
 	    retorno = PExpPrimaria()
@@ -626,6 +629,40 @@ Expressao PExpressao() :
 	{
 		return retorno;
 	}
+}
+
+/* Interval operator parsing */
+
+ExpIn PExpIn() :
+{
+    Expressao target;
+    IntervaloSpec intervalo;
+}
+{
+    target = PExpPrimaria() <IN> intervalo = PIntervalo()
+    { return new ExpIn(target, intervalo.getLower(), intervalo.getUpper(), intervalo.isLowerInclusive(), intervalo.isUpperInclusive()); }
+}
+
+IntervaloSpec PIntervalo() :
+{
+    boolean lowerInclusive;
+    boolean upperInclusive;
+    Expressao lb;
+    Expressao ub;
+}
+{
+    (
+        <LBRACKET> { lowerInclusive = true; }
+      | <LPAREN>   { lowerInclusive = false; }
+    )
+    lb = PExpressao()
+    <DOT> <DOT>
+    ub = PExpressao()
+    (
+        <RBRACKET> { upperInclusive = true; }
+      | <RPAREN>   { upperInclusive = false; }
+    )
+    { return new IntervaloSpec(lb, ub, lowerInclusive, upperInclusive); }
 }
 
 /*  ADICIONADO OU MODIFICADO DA Imperativa1 PARA A Imperativa2  */

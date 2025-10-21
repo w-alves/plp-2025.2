@@ -81,6 +81,26 @@ ChamadaProcedimento ::= "call" Id "(" [ {% include code-link.html path="Imperati
 ListaExpressao ::= Expressao \| Expressao, ListaExpressao
 
 
+## Operador `in` (intervalo)
+
+Expressões podem verificar pertinência a intervalos:
+
+```
+if x in [0..10) then
+  write("ok")
+else
+  skip
+```
+
+Equivalências:
+
+- (A..B): A < x and x < B
+- (A..B]: A < x and x <= B
+- [A..B): A <= x and x < B
+- [A..B]: A <= x and x <= B
+
+Observação: por enquanto `in` aceita apenas expressões inteiras. Chamadas de procedimento como expressão serão suportadas futuramente.
+
 ## Classes Auxiliares
 
 {% include code-link.html path="Imperativa2/src/li2/plp/imperative2/memory/AmbienteExecucaoImperativa2.java" %}\
