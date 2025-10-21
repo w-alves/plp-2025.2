@@ -34,24 +34,26 @@ O projeto exigirá modificações no analisador sintático e na fase de avaliaç
 
 ### A. Análise Sintática (Parser)
 
-  * **Expansão da Gramática (BNF):** Modificar a BNF para incluir a produção `expressao "in" intervalo`. A precedência deste operador deve ser similar à dos operadores relacionais (`<`, `>`, `==`).
+  * **Expansão da Gramática (BNF):** Modificar a BNF para incluir a produção `Expressao "in" Intervalo`. A precedência deste operador deve ser similar à dos operadores relacionais (`<`, `>`, `==`).
 
     ```bnf
-    <expr_bool> ::= <expr> <op_rel> <expr>
-                  | <expr> "in" <intervalo>
-                  | ...
+    ExpBinaria ::= Expressao "+" Expressao
+               | Expressao "-" Expressao
+               | Expressao "and" Expressao
+               | Expressao "or" Expressao
+               | Expressao "==" Expressao
+               | Expressao "++" Expressao
+               | Expressao "in" Intervalo
 
-    <intervalo> ::= <delim_esq> <expr> ".." <expr> <delim_dir>
+    Intervalo ::= DelimitadorEsq Expressao ".." Expressao DelimitadorDir
 
-    <delim_esq> ::= "(" | "["
-    <delim_dir> ::= ")" | "]"
-
-    <expr> ::= ... (definição de expressão padrão da LI2)
+    DelimitadorEsq ::= "(" | "["
+    DelimitadorDir ::= ")" | "]"
     ```
 
 ### B. Análise Semântica e Runtime (Garantia de Avaliação Única)
 
-A expressão `Exp in <Intervalo>` deve ser transformada em uma lógica `AND` (duas comparações). O desafio central é a ordem e a memoização (armazenamento) da avaliação para garantir a corretude com *side effects*.
+A expressão `Expressao in Intervalo` deve ser transformada em uma lógica `AND` (duas comparações). O desafio central é a ordem e a memoização (armazenamento) da avaliação para garantir a corretude com *side effects*.
 
 O interpretador deve implementar o seguinte mecanismo:
 
