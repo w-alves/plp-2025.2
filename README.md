@@ -10,6 +10,24 @@ Estender a **Linguagem Imperativa 2 (LI2)** para suportar um **operador de verif
 
 Linguagem Imperativa 2 (LI2).
 
+## 3.1\. Funções com Retorno (Pré-requisito)
+
+O uso de `Exp in [A..B)` pressupõe que expressões possam invocar operações com valor de retorno (e.g., `f()` dentro de uma soma). A LI2 atual expõe apenas procedimentos (`proc`) utilizados como comandos via `call`, o que impede chamadas em contexto de expressão. Antes de evoluir o operador `in`, precisamos introduzir **funções com retorno** na linguagem.
+
+- **Sintaxe sugerida**
+
+  ```
+  func Id ( [ ListaDeclaracaoParametro ] ) : Tipo {
+      Comando*            // corpo com efeitos colaterais opcionais
+      return Expressao;   // valor final
+  }
+
+  ExpressaoPrimaria ::= ... | Id "(" [ ListaExpressao ] ")"
+  ```
+  
+Com essa extensão, chamadas com efeitos colaterais podem participar de qualquer expressão e ser reutilizadas pelo operador `in` sem reexecução desnecessária.
+
+
 -----
 
 ## 4\. Definição da Nova Sintaxe: Operador 'in'
@@ -45,7 +63,21 @@ O projeto exigirá modificações no analisador sintático e na fase de avaliaç
     <delim_esq> ::= "(" | "["
     <delim_dir> ::= ")" | "]"
 
-    <expr> ::= ... (definição de expressão padrão da LI2)
+    <comando> ::= ...                       // (definição de expressão padrão da LI2)
+               | <return>                   
+
+    <return> ::= "return" <expressao>
+
+    <declaracao> ::= ...                    // (definições padrão da LI2)
+                   | <declaracao_funcao>   
+
+    <declaracao_funcao> ::= "func" <id> "(" [ <lista_declaracao_parametro> ] ")"
+                            ":" <tipo> "{" <comando>* "return" <expressao> "}"
+
+    <expressao> ::= ...                     // (definição de expressão padrão da LI2)
+                 | <chamada_funcao>         
+
+    <chamada_funcao> ::= <id> "(" [ <lista_expressao> ] ")"
     ```
 
 ### B. Análise Semântica e Runtime (Garantia de Avaliação Única)
