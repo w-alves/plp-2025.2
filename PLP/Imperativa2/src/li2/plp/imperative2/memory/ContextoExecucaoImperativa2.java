@@ -6,6 +6,7 @@ import li2.plp.expressions2.memory.VariavelJaDeclaradaException;
 import li2.plp.expressions2.memory.VariavelNaoDeclaradaException;
 import li2.plp.imperative1.memory.ContextoExecucaoImperativa;
 import li2.plp.imperative1.memory.ListaValor;
+import li2.plp.imperative2.declaration.DefFuncao;
 import li2.plp.imperative2.declaration.DefProcedimento;
 
 public class ContextoExecucaoImperativa2 extends ContextoExecucaoImperativa
@@ -16,6 +17,7 @@ public class ContextoExecucaoImperativa2 extends ContextoExecucaoImperativa
 	 * armazena apenas procedimentos.
 	 */
 	private Contexto<DefProcedimento> contextoProcedimentos;
+	private Contexto<DefFuncao> contextoFuncoes;
 
 	/**
 	 * Construtor da classe.
@@ -23,18 +25,21 @@ public class ContextoExecucaoImperativa2 extends ContextoExecucaoImperativa
 	public ContextoExecucaoImperativa2(ListaValor entrada) {
 		super(entrada);
 		contextoProcedimentos = new Contexto<DefProcedimento>();
+		contextoFuncoes = new Contexto<DefFuncao>();
 	}
 
 	@Override
 	public void incrementa() {
 		super.incrementa();
 		this.contextoProcedimentos.incrementa();
+		this.contextoFuncoes.incrementa();
 	}
 
 	@Override
 	public void restaura() {
 		super.restaura();
 		this.contextoProcedimentos.restaura();
+		this.contextoFuncoes.restaura();
 	}
 
 	/**
@@ -68,5 +73,23 @@ public class ContextoExecucaoImperativa2 extends ContextoExecucaoImperativa
 			throw new ProcedimentoNaoDeclaradoException(idArg);
 		}
 
+	}
+
+	public void mapFuncao(Id idArg, DefFuncao funcaoId)
+			throws FuncaoJaDeclaradaException {
+		try {
+			this.contextoFuncoes.map(idArg, funcaoId);
+		} catch (VariavelJaDeclaradaException e) {
+			throw new FuncaoJaDeclaradaException(idArg);
+		}
+	}
+
+	public DefFuncao getFuncao(Id idArg)
+			throws FuncaoNaoDeclaradaException {
+		try {
+			return this.contextoFuncoes.get(idArg);
+		} catch (VariavelNaoDeclaradaException e) {
+			throw new FuncaoNaoDeclaradaException(idArg);
+		}
 	}
 }

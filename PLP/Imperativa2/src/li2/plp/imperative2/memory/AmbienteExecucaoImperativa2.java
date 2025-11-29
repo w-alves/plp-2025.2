@@ -2,6 +2,7 @@ package li2.plp.imperative2.memory;
 
 import li2.plp.expressions2.expression.Id;
 import li2.plp.imperative1.memory.AmbienteExecucaoImperativa;
+import li2.plp.imperative2.declaration.DefFuncao;
 import li2.plp.imperative2.declaration.DefProcedimento;
 
 public interface AmbienteExecucaoImperativa2 extends AmbienteExecucaoImperativa {
@@ -11,5 +12,11 @@ public interface AmbienteExecucaoImperativa2 extends AmbienteExecucaoImperativa 
 
 	public DefProcedimento getProcedimento(Id idArg)
 			throws ProcedimentoNaoDeclaradoException;
+
+	public void mapFuncao(Id idArg, DefFuncao funcaoId)
+			throws FuncaoJaDeclaradaException;
+
+	public DefFuncao getFuncao(Id idArg)
+			throws FuncaoNaoDeclaradaException;
 
 }

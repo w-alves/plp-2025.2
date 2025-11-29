@@ -1,9 +1,17 @@
-{ 
-   var a  =  1 ,
-   proc incA (int z)  {
-     a := a + z
+{
+   var count = 0,
+   var message = "Falha",
+   func side_effect_func() : int {
+      count := count + 1;
+      return 5
    };
-   call incA(3);
-   call incA(5);
-   write(a)
+   if (side_effect_func() in [side_effect_func()..10)) then (
+      message := "Sucesso";
+      write(message);
+      write(count)
+   ) else (
+      message := "Falha";
+      write(message);
+      write(count)
+   )
 }

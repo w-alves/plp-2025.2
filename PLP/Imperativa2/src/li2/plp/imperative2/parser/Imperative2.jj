@@ -15,10 +15,45 @@ import li2.plp.imperative1.memory.*;
 import li2.plp.imperative2.*;
 import li2.plp.imperative2.command.*;
 import li2.plp.imperative2.declaration.*;
+import li2.plp.imperative2.expression.*;
 import li2.plp.imperative2.memory.*;
 import java.util.*;
 
 public class Imp2Parser {
+
+    private static Deque<Tipo> funcReturnTypes = new ArrayDeque<Tipo>();
+    private static Deque<Boolean> funcReturnSeen = new ArrayDeque<Boolean>();
+
+    private static void pushFunctionContext(Tipo tipoRetorno) {
+        funcReturnTypes.push(tipoRetorno);
+        funcReturnSeen.push(Boolean.FALSE);
+    }
+
+    private static void markReturnStatement() throws ParseException {
+        if (funcReturnSeen.isEmpty()) {
+            throw new ParseException("Comando return fora de funcao.");
+        }
+        funcReturnSeen.pop();
+        funcReturnSeen.push(Boolean.TRUE);
+    }
+
+    private static Tipo getCurrentFunctionReturnType() throws ParseException {
+        if (funcReturnTypes.isEmpty()) {
+            throw new ParseException("Comando return fora de funcao.");
+        }
+        return funcReturnTypes.peek();
+    }
+
+    private static void popFunctionContext(Id nomeFuncao) throws ParseException {
+        if (funcReturnTypes.isEmpty() || funcReturnSeen.isEmpty()) {
+            throw new ParseException("Inconsistencia ao fechar funcao " + nomeFuncao);
+        }
+        boolean possuiRetorno = funcReturnSeen.pop().booleanValue();
+        funcReturnTypes.pop();
+        if (!possuiRetorno) {
+            throw new ParseException("Funcao " + nomeFuncao + " deve possuir ao menos um return.");
+        }
+    }
 
     public static void main(String args[]) {
 	    Imp2Parser parser;
@@ -132,6 +167,9 @@ TOKEN : /* TOKENS DE IMPERATIVA 2 */
 {
   < PROC: "proc" >
 | < CALL: "call" >
+| < FUNC: "func" >
+| < RETURN: "return" >
+| < IN: "in" >
 }
 
 TOKEN : /* TOKENS DOS POSS�VEIS TIPOS */
@@ -224,6 +262,7 @@ TOKEN : /* SEPARATORS */
 | < SEMICOLON: ";" >
 | < COMMA: "," >
 | < DOT: "." >
+| < DOTDOT: ".." >
 }
 
 TOKEN : /* OPERATORS */
@@ -302,9 +341,9 @@ SequenciaComando PSequenciaComando() :
 	{return new SequenciaComando(c1, c2);}
 }
 
-IO PIO() :
+li2.plp.imperative1.command.IO PIO() :
 {
-	IO retorno;
+	li2.plp.imperative1.command.IO retorno;
 }
 {
 	(
@@ -334,6 +373,25 @@ Write PWrite() :
 		exp = PExpressao()
 		   <RPAREN>
 	{return new Write(exp);}
+}
+
+Comando PReturn() :
+{
+	Expressao exp;
+	Tipo tipoRetorno = null;
+}
+{
+	<RETURN>
+		exp = PExpressao()
+	{
+		try {
+			tipoRetorno = getCurrentFunctionReturnType();
+			markReturnStatement();
+		} catch (ParseException e) {
+			throw e;
+		}
+		return new ReturnCommand(exp, tipoRetorno);
+	}
 }
 
 IfThenElse PIfThenElse() :
@@ -484,12 +542,28 @@ Expressao PExpPrimaria() :
 }
 {
 	(  
-	    retorno = PId()
+	    LOOKAHEAD(<IDENTIFIER> <LPAREN>) retorno = PChamadaFuncaoExpressao()
+	  | retorno = PId()
 	  | retorno = PValor() 
 	  | <LPAREN> retorno = PExpressao() <RPAREN>
 	)
 	{
 		return retorno; 
+	}
+}
+
+Expressao PChamadaFuncaoExpressao() :
+{
+	Id nomeFuncao;
+	ListaExpressao parametros;
+}
+{
+	nomeFuncao = PId()
+	<LPAREN>
+		parametros = PListaExpressao()
+	<RPAREN>
+	{
+		return new ChamadaFuncao(nomeFuncao, parametros);
 	}
 }
 
@@ -610,13 +684,42 @@ ExpConcat PExpConcat() :
 	{return new ExpConcat(esq, dir);}
 }
 
+Expressao PExpIntervalo() :
+{
+	Expressao valor;
+	Expressao limiteInferior;
+	Expressao limiteSuperior;
+	boolean incluiInferior = false;
+	boolean incluiSuperior = false;
+}
+{
+	valor = PExpPrimaria()
+	<IN>
+	(
+		<LPAREN> { incluiInferior = false; }
+	  | <LBRACKET> { incluiInferior = true; }
+	)
+	limiteInferior = PExpressao()
+	<DOTDOT>
+	limiteSuperior = PExpressao()
+	(
+		<RPAREN> { incluiSuperior = true; }   // ")" inclusive
+	  | <RBRACKET> { incluiSuperior = false; } // "]" exclusive
+	)
+	{
+		return new ExpIntervaloInclusivo(valor, limiteInferior, limiteSuperior, incluiInferior, incluiSuperior);
+	}
+}
+
 Expressao PExpressao() :
 {
 	Expressao retorno;
 }
 {
 	(
-	    LOOKAHEAD (2) 
+	    LOOKAHEAD (PExpPrimaria() <IN>)
+	  		retorno = PExpIntervalo()
+	  | LOOKAHEAD (2) 
 	  		retorno = PExpUnaria()
 	  | LOOKAHEAD (PExpPrimaria() (<OR> | <AND> | <MINUS> | <PLUS> | <EQ> | <CONCAT>)) 
 	  		retorno = PExpBinaria()
@@ -642,6 +745,7 @@ Comando PComandoSimples() :
       | retorno = PWhile()
       | retorno = PIfThenElse()
       | retorno = PIO()
+      | retorno = PReturn()
       | <LPAREN> retorno = PComando() <RPAREN>
       | retorno = PChamadaProcedimento()
    	)
@@ -684,12 +788,14 @@ Declaracao PDeclaracao():
 	(
 		  LOOKAHEAD(PDeclaracaoVariavel() <COMMA>)
            retorno = PDeclaracaoComposta()
-          |LOOKAHEAD(PDeclaracaoProcedimento() <COMMA>)
-           retorno = PDeclaracaoComposta() 
-		  | retorno = PDeclaracaoVariavel()
-		  | retorno = PDeclaracaoProcedimento()
-          | <LPAREN> retorno = PDeclaracao() <RPAREN>   		 
-		  
+        | LOOKAHEAD(PDeclaracaoProcedimento() <COMMA>)
+           retorno = PDeclaracaoComposta()
+        | LOOKAHEAD(PDeclaracaoFuncao() <COMMA>)
+           retorno = PDeclaracaoComposta()
+        | LOOKAHEAD(<VAR>) retorno = PDeclaracaoVariavel()
+        | LOOKAHEAD(<PROC>) retorno = PDeclaracaoProcedimento()
+        | LOOKAHEAD(<FUNC>) retorno = PDeclaracaoFuncao()
+        | <LPAREN> retorno = PDeclaracao() <RPAREN>
 	)
 	{return retorno;}
 }
@@ -705,6 +811,9 @@ DeclaracaoComposta PDeclaracaoComposta():
 	 
 	 |  LOOKAHEAD(PDeclaracaoProcedimento() <COMMA>)
 	 d1 = PDeclaracaoProcedimento() <COMMA> d2 = PDeclaracao()
+	 
+	 |  LOOKAHEAD(PDeclaracaoFuncao() <COMMA>)
+	 d1 = PDeclaracaoFuncao() <COMMA> d2 = PDeclaracao()
 	)
 	
 	{return new DeclaracaoComposta(d1, d2);}
@@ -724,6 +833,34 @@ DeclaracaoProcedimento PDeclaracaoProcedimento():
     )
 	{
 	    return new DeclaracaoProcedimento (nome, defProcedimento);
+	}
+}
+
+DeclaracaoFuncao PDeclaracaoFuncao():
+{
+	Id nome;
+	ListaDeclaracaoParametro parametros;
+	Comando comando;
+	Tipo tipoRetorno;
+}
+{
+	<FUNC> nome = PId() <LPAREN>
+		parametros = PListaDeclaracaoParametro()
+	<RPAREN> <COLON>
+	tipoRetorno = PTipo()
+	<LBRACE>
+	{
+		pushFunctionContext(tipoRetorno);
+	}
+		comando = PComando()
+	<RBRACE>
+	{
+		try {
+			popFunctionContext(nome);
+		} catch (ParseException e) {
+			throw e;
+		}
+		return new DeclaracaoFuncao(nome, new DefFuncao(parametros, comando, tipoRetorno));
 	}
 }
 
