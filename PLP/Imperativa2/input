@@ -3,7 +3,7 @@
    var message = "Falha",
    func side_effect_func() : int {
       count := count + 1;
-      return 5
+      return count
    };
    if (side_effect_func() in [side_effect_func()..10)) then (
       message := "Sucesso";
