@@ -36,10 +36,10 @@ A nova feature introduz o operador `in` para verificação de intervalo, substit
 
 | Sintaxe LI2 | Equivalência Lógica | Definição (Limite A) | Definição (Limite B) |
 | :--- | :--- | :--- | :--- |
-| `Exp in (A..B)` | $(A < \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `(` Exclusivo | `)` Inclusivo |
-| `Exp in (A..B]` | $(A < \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `(` Exclusivo | `]` Exclusivo |
-| `Exp in [A..B)` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `[` Inclusivo | `)` Inclusivo |
-| `Exp in [A..B]` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `[` Inclusivo | `]` Exclusivo |
+| `Exp in (A..B)` | $(A < \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `(` Exclusivo | `)` Exclusivo |
+| `Exp in (A..B]` | $(A < \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `(` Exclusivo | `]` Inclusivo |
+| `Exp in [A..B)` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} \le B)$ | `[` Inclusivo | `)` Exclusivo |
+| `Exp in [A..B]` | $(A \le \text{Exp}) \text{ AND } (\text{Exp} < B)$ | `[` Inclusivo | `]` Inclusivo |
 
 O desafio central é que `Exp`, `A` e `B` podem ser chamadas de procedimentos com efeitos colaterais, e a semântica de avaliação deve ser rigorosa.
 
@@ -51,33 +51,43 @@ O projeto exigirá modificações no analisador sintático e na fase de avaliaç
 
 ### A. Análise Sintática (Parser)
 
-  * **Expansão da Gramática (BNF):** Modificar a BNF para incluir a produção `expressao "in" intervalo`. A precedência deste operador deve ser similar à dos operadores relacionais (`<`, `>`, `==`).
+  * **Expansão da Gramática (BNF):** Modificar a BNF para incluir a produção `Expressao "in" Intervalo`. A precedência deste operador deve ser similar à dos operadores relacionais (`<`, `>`, `==`).
 
     ```bnf
-    <expr_bool> ::= <expr> <op_rel> <expr>
-                  | <expr> "in" <intervalo>
-                  | ...
+    Expressao ::= Valor
+                | ExpUnaria 
+                | ExpBinaria 
+                | Id
+                | ChamadaFuncao
+                | Expressao "in" Intervalo
 
-    <intervalo> ::= <delim_esq> <expr> ".." <expr> <delim_dir>
+    Intervalo ::= DelimEsq Expressao ".." Expressao DelimDir
 
-    <delim_esq> ::= "(" | "["
-    <delim_dir> ::= ")" | "]"
+    DelimEsq ::= "(" | "["
+    DelimDir ::= ")" | "]"
 
-    <comando> ::= ...                       // (definição de expressão padrão da LI2)
-               | <return>                   
+    Comando ::= Atribuicao
+            | ComandoDeclaracao
+            | While
+            | IfThenElse
+            | IO
+            | Comando ";" Comando
+            | Skip
+            | ChamadaProcedimento
+            | Return
 
-    <return> ::= "return" <expressao>
+    Return ::= "return" Expressao
 
-    <declaracao> ::= ...                    // (definições padrão da LI2)
-                   | <declaracao_funcao>   
+    Declaracao ::= DeclaracaoVariavel
+                | DeclaracaoProcedimento
+                | DeclaracaoComposta
+                | DeclaracaoFuncao
 
-    <declaracao_funcao> ::= "func" <id> "(" [ <lista_declaracao_parametro> ] ")"
-                            ":" <tipo> "{" <comando>* "return" <expressao> "}"
+    DeclaracaoFuncao ::= "func" Id "(" [ ListaDeclaracaoParametro ] ")"
+                        ":" Tipo
+                        "{" Comando* "return" Expressao "}"
 
-    <expressao> ::= ...                     // (definição de expressão padrão da LI2)
-                 | <chamada_funcao>         
-
-    <chamada_funcao> ::= <id> "(" [ <lista_expressao> ] ")"
+    ChamadaFuncao ::= Id "(" [ ListaExpressao ] ")"
     ```
 
 ### B. Análise Semântica e Runtime (Garantia de Avaliação Única)
@@ -90,7 +100,7 @@ O interpretador deve implementar o seguinte mecanismo:
 2.  **Avaliar `Exp` e todos os seus *side effects* rigorosamente uma única vez** e armazenar seu resultado (`val_exp`).
 3.  **Consultar o Resultado de `Exp` (Core da Feature):** Se a expressão `BoundA` for *sintaticamente idêntica* a `Exp` (e.g., a mesma chamada de função `f()`), o interpretador **não deve re-executá-la**. Ele deve, em vez disso, usar o valor já armazenado (`val_exp`) como `val_bound_a`. O mesmo se aplica a `BoundB`.
 4.  Avaliar `BoundA` e `BoundB` (apenas se *não* forem idênticas a `Exp` e, portanto, não "consultadas" no passo 3) e armazenar seus resultados.
-5.  Executar as duas comparações lógicas (e.g., para `[A..B]`, seria `(val_bound_a <= val_exp) AND (val_exp < val_bound_b)`), respeitando o curto-circuito do `AND`.
+5.  Executar as duas comparações lógicas (e.g., para `[A..B]`, seria `(val_bound_a <= val_exp) AND (val_exp <= val_bound_b)`), respeitando o curto-circuito do `AND`.
 
 Esta abordagem garante que uma expressão tautológica como `f() in [f()..10)` execute `f()` apenas uma vez, usando seu resultado tanto como o valor a ser testado (`Exp`) quanto como o limite inferior (`BoundA`).
 
@@ -108,7 +118,7 @@ O projeto será aceito se for capaz de executar corretamente o seguinte cenário
     }
     
     // Teste Crítico: Tautologia e Avaliação Única
-    // Usando a sintaxe [A..B), que equivale a A <= x <= B.
+    // Usando a sintaxe [A..B), que equivale a A <= x < B.
     // A expressão 'side_effect_func()' é Exp e também BoundA.
     // Ela deve ser avaliada APENAS UMA VEZ.
     
