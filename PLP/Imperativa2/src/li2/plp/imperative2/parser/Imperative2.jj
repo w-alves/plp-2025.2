@@ -703,8 +703,8 @@ Expressao PExpIntervalo() :
 	<DOTDOT>
 	limiteSuperior = PExpressao()
 	(
-		<RPAREN> { incluiSuperior = true; }   // ")" inclusive
-	  | <RBRACKET> { incluiSuperior = false; } // "]" exclusive
+		<RPAREN> { incluiSuperior = false; }   // ")" exclusive
+	  | <RBRACKET> { incluiSuperior = true; }  // "]" inclusive
 	)
 	{
 		return new ExpIntervaloInclusivo(valor, limiteInferior, limiteSuperior, incluiInferior, incluiSuperior);
