@@ -25,45 +25,51 @@ public final class ExpressaoComparator {
 		if (a == null || b == null) {
 			return false;
 		}
-		if (a.getClass() != b.getClass()) {
+
+		// Normalize expressions before comparison to handle semantic equivalence
+		// (e.g., a+b == b+a for pure expressions)
+		Expressao aNorm = ExpressaoNormalizer.normalizar(a);
+		Expressao bNorm = ExpressaoNormalizer.normalizar(b);
+
+		if (aNorm.getClass() != bNorm.getClass()) {
 			return false;
 		}
 
-		if (a instanceof ValorConcreto && b instanceof ValorConcreto) {
-			return ((ValorConcreto<?>) a).valor().equals(((ValorConcreto<?>) b).valor());
+		if (aNorm instanceof ValorConcreto && bNorm instanceof ValorConcreto) {
+			return ((ValorConcreto<?>) aNorm).valor().equals(((ValorConcreto<?>) bNorm).valor());
 		}
-		if (a instanceof Id && b instanceof Id) {
-			return ((Id) a).getIdName().equals(((Id) b).getIdName());
+		if (aNorm instanceof Id && bNorm instanceof Id) {
+			return ((Id) aNorm).getIdName().equals(((Id) bNorm).getIdName());
 		}
-		if (a instanceof ExpBinaria && b instanceof ExpBinaria) {
-			ExpBinaria ea = (ExpBinaria) a;
-			ExpBinaria eb = (ExpBinaria) b;
+		if (aNorm instanceof ExpBinaria && bNorm instanceof ExpBinaria) {
+			ExpBinaria ea = (ExpBinaria) aNorm;
+			ExpBinaria eb = (ExpBinaria) bNorm;
 			return ea.getOperador().equals(eb.getOperador())
 					&& estruturaIgual(ea.getEsq(), eb.getEsq())
 					&& estruturaIgual(ea.getDir(), eb.getDir());
 		}
-		if (a instanceof ExpUnaria && b instanceof ExpUnaria) {
-			ExpUnaria ea = (ExpUnaria) a;
-			ExpUnaria eb = (ExpUnaria) b;
+		if (aNorm instanceof ExpUnaria && bNorm instanceof ExpUnaria) {
+			ExpUnaria ea = (ExpUnaria) aNorm;
+			ExpUnaria eb = (ExpUnaria) bNorm;
 			return ea.getOperador().equals(eb.getOperador())
 					&& estruturaIgual(ea.getExp(), eb.getExp());
 		}
-		if (a instanceof ChamadaFuncao && b instanceof ChamadaFuncao) {
-			ChamadaFuncao fa = (ChamadaFuncao) a;
-			ChamadaFuncao fb = (ChamadaFuncao) b;
+		if (aNorm instanceof ChamadaFuncao && bNorm instanceof ChamadaFuncao) {
+			ChamadaFuncao fa = (ChamadaFuncao) aNorm;
+			ChamadaFuncao fb = (ChamadaFuncao) bNorm;
 			return estruturaIgual(fa.getNomeFuncao(), fb.getNomeFuncao())
 					&& listasIguais(fa.getParametrosReais(), fb.getParametrosReais());
 		}
-		if (a instanceof ExpIntervaloInclusivo && b instanceof ExpIntervaloInclusivo) {
-			ExpIntervaloInclusivo ea = (ExpIntervaloInclusivo) a;
-			ExpIntervaloInclusivo eb = (ExpIntervaloInclusivo) b;
+		if (aNorm instanceof ExpIntervaloInclusivo && bNorm instanceof ExpIntervaloInclusivo) {
+			ExpIntervaloInclusivo ea = (ExpIntervaloInclusivo) aNorm;
+			ExpIntervaloInclusivo eb = (ExpIntervaloInclusivo) bNorm;
 			return estruturaIgual(ea.getValor(), eb.getValor())
 					&& estruturaIgual(ea.getLimiteInferior(), eb.getLimiteInferior())
 					&& estruturaIgual(ea.getLimiteSuperior(), eb.getLimiteSuperior())
 					&& ea.isIncluiInferior() == eb.isIncluiInferior()
 					&& ea.isIncluiSuperior() == eb.isIncluiSuperior();
 		}
-		return a.equals(b);
+		return aNorm.equals(bNorm);
 	}
 
 	private static boolean listasIguais(ListaExpressao listaA, ListaExpressao listaB) {
@@ -98,4 +104,3 @@ public final class ExpressaoComparator {
 		return resultado;
 	}
 }
-
