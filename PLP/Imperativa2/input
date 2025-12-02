@@ -1,17 +1,23 @@
 {
-   var count = 0,
-   var message = "Falha",
-   func side_effect_func() : int {
-      count := count + 1;
-      return count
-   };
-   if (side_effect_func() in [side_effect_func()..10)) then (
-      message := "Sucesso";
-      write(message);
-      write(count)
-   ) else (
-      message := "Falha";
-      write(message);
-      write(count)
-   )
+    var count = 0,
+    var a = 5,
+    var b = 3,
+    func side_effect_func() : int {
+        count := count + 1;
+        return 5
+    };
+    
+    // Test 1: Pure commutativity - should recognize (a + b) == (b + a)
+    // This should trigger the optimization and evaluate only once
+    write((a + b) in [(b + a)..10]);
+    
+    // Test 2: Basic interval test (control case)
+    write(5 in [1..10]);
+    write(1 in (1..10]);
+
+    // Test 3: Tautology with side effects
+    write(side_effect_func() in [side_effect_func()..10));
+    
+    write("Count after Test 3:");
+    write(count)
 }
