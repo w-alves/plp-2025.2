@@ -4,7 +4,7 @@
     var b = 3,
     func side_effect_func() : int {
         count := count + 1;
-        return 5
+        return count
     };
     
     // Test 1: Pure commutativity - should recognize (a + b) == (b + a)
